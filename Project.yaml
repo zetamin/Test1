@@ -1,0 +1,21 @@
+name: Windows Setup and RDP Configuration
+
+on: [push, pull_request]
+
+jobs:
+  setup-windows:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install Packer
+      run: |
+        wget https://releases.hashicorp.com/packer/1.7.7/packer_1.7.7_linux_amd64.zip
+        unzip packer_1.7.7_linux_amd64.zip
+        sudo mv packer /usr/local/bin/
+
+    - name: Execute Packer build
+      run: |
+        packer build -var 'username=root' -var 'password=1234' -var 'rdp_ip_address_output=true' windows-packer-template.json
