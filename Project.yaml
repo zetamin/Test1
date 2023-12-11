@@ -1,21 +1,36 @@
-name: Windows Setup and RDP Configuration
+name: Ubuntu Desktop Environment
 
 on: [push, pull_request]
 
 jobs:
-  setup-windows:
+  ubuntu-desktop:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Install Packer
+    - name: Set up QEMU and VNC
       run: |
-        wget https://releases.hashicorp.com/packer/1.7.7/packer_1.7.7_linux_amd64.zip
-        unzip packer_1.7.7_linux_amd64.zip
-        sudo mv packer /usr/local/bin/
+        sudo apt-get update
+        sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virtinst
+        sudo systemctl start libvirtd
+        sudo systemctl enable libvirtd
+        sudo usermod -aG libvirt "$(whoami)"
+        sudo usermod -aG kvm "$(whoami)"
+        sudo modprobe vhost_net
+        echo "1" | sudo tee /sys/module/vhost_net/parameters/enable_unsafe_noiommu_mode
 
-    - name: Execute Packer build
+    - name: Launch Ubuntu VM
       run: |
-        packer build -var 'username=root' -var 'password=1234' -var 'rdp_ip_address_output=true' windows-packer-template.json
+        qemu-img create -f qcow2 ubuntu-desktop.qcow2 20G
+        virt-install --name ubuntu-desktop --ram 4096 --vcpus 2 --disk path=ubuntu-desktop.qcow2,format=qcow2 --os-type linux --os-variant ubuntu20.04 --graphics vnc --network bridge=virbr0,model=virtio --noautoconsole
+
+    - name: Output IP Address
+      run: |
+        sleep 60 # Wait for the VM to start
+        sudo virsh net-dhcp-leases default | awk '/ubuntu-desktop/ {print $5}'
+
+    - name: Execute Custom Commands
+      run: |
+        echo "Custom commands go here"
